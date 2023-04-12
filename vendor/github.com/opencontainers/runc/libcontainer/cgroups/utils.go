@@ -55,12 +55,12 @@ func IsCgroup2HybridMode() bool {
 		var st unix.Statfs_t
 		err := unix.Statfs(hybridMountpoint, &st)
 		if err != nil {
-			if os.IsNotExist(err) {
-				// ignore the "not found" error
-				isHybrid = false
-				return
+			isHybrid = false
+			if !os.IsNotExist(err) {
+				// Report unexpected errors.
+				logrus.WithError(err).Debugf("statfs(%q) failed", hybridMountpoint)
 			}
-			panic(fmt.Sprintf("cannot statfs cgroup root: %s", err))
+			return
 		}
 		isHybrid = st.Type == unix.CGROUP2_SUPER_MAGIC
 	})
@@ -162,8 +162,10 @@ func readProcsFile(dir string) ([]int, error) {
 
 // ParseCgroupFile parses the given cgroup file, typically /proc/self/cgroup
 // or /proc/<pid>/cgroup, into a map of subsystems to cgroup paths, e.g.
-//   "cpu": "/user.slice/user-1000.slice"
-//   "pids": "/user.slice/user-1000.slice"
+//
+//	"cpu": "/user.slice/user-1000.slice"
+//	"pids": "/user.slice/user-1000.slice"
+//
 // etc.
 //
 // Note that for cgroup v2 unified hierarchy, there are no per-controller
